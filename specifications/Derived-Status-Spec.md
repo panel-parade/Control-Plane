@@ -23,6 +23,10 @@ Only: work items (state, `required`), exception records, and evaluation time. No
 
 Outcome precedence: product behaviour outranks register state. A Level 3 finding that the product does not meet intent overrides a derived `COMPLETE` (see Evidence Spec, Outcome Validation).
 
+## 4a. Default Behaviour
+
+`required = false` by default. Implementations may only treat work items as completion-gating when `required = true`.
+
 ## 5. Programme Roll-Up
 
 Worst of its projects by severity `RED > AMBER > GREEN`; `COMPLETE` only if all projects are `COMPLETE`.
