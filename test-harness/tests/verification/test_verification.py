@@ -19,6 +19,7 @@ from verification import (
     validate_record,
     verify,
 )
+from verification.transition import failure_exception
 
 NOW = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
 SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
@@ -126,6 +127,13 @@ def test_all_checks_pass_returns_pass():
     assert result.detail == ()
     assert result.checked_ts == NOW
     assert may_complete(result) is True
+
+
+def test_failed_verification_keeps_item_claimed_complete_and_raises_verification_failure():
+    source = FakeSource(commits={("panel-parade/Control-Plane", SHA)})
+    result = verify(WORK, [COMMIT, TESTS], [Check("E-1"), Check("E-2")], source, NOW)
+    assert failure_exception(result) == "VERIFICATION_FAILURE"
+    assert failure_exception(verify(WORK, [COMMIT], [Check("E-1")], COMMIT_OK, NOW)) is None
 
 
 def test_failed_check_returns_fail_with_failing_check_detail():

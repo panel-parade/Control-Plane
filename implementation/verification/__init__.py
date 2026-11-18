@@ -13,7 +13,13 @@ No dependency on implementation/schema or implementation/services.
 from .checks import Check, verify
 from .evidence import CheckFailure, EvidenceRecord, EvidenceType, VerificationResult, VerificationStatus
 from .external import ExternalSource
-from .transition import attach_evidence, can_claim_complete, may_complete
+from .transition import (
+    VERIFICATION_FAILURE,
+    attach_evidence,
+    can_claim_complete,
+    failure_exception,
+    may_complete,
+)
 from .validation import InvalidEvidenceError, is_structurally_valid, parse_reference, validate_record
 
 __all__ = [
@@ -29,6 +35,8 @@ __all__ = [
     "can_claim_complete",
     "is_structurally_valid",
     "may_complete",
+    "failure_exception",
+    "VERIFICATION_FAILURE",
     "parse_reference",
     "validate_record",
     "verify",

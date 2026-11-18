@@ -21,6 +21,6 @@ Implements Evidence-Spec §3 to §6 with no state writes.
 | `evidence_ref` is a list of records per work item, not a single ID. | Evidence-Spec assumes a list; Work-Register-Spec §3/§8 says single. Mismatch flagged. | Single reference. |
 | Unknown external state or raised exception fails the check (fail-closed). | Prevents false PASS. | Treat as unverified. |
 | Zero checks returns FAIL (`NO_CHECKS`). | A pass with no checks would be vacuous. | Pass vacuously. |
-| Failed verification leaves the item in Claimed Complete; no Claimed Complete → Active transition. | Maintains the evidence trail. | Return to Active. |
+| Failed verification leaves the item in Claimed Complete and raises `VERIFICATION_FAILURE` (via `failure_exception`); no Claimed Complete → Active transition. | Preserves the worker's completion claim and the evidence trail; fix by attaching new evidence and re-verifying. | Return to Active. |
 | Module returns detail only; raising verification-delay exceptions is left to Exception-Detection. | Keeps this module free of state and scheduling. | Emit exceptions here. |
 | Reference formats are chosen here because the spec gives only examples (see `validation.py`). | Needed to implement structural validity. | Wait for a spec. |

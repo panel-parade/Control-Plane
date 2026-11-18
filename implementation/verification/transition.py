@@ -5,13 +5,16 @@
 - Attaching evidence (`attach_evidence`) returns a new tuple of records. It
   takes no state argument and has no side effects beyond the returned value.
 - T5 (Claimed Complete -> Complete): `may_complete` is true only for a PASS.
+- Verification failure: the item stays in Claimed Complete. `failure_exception`
+  returns the VERIFICATION_FAILURE exception type for a FAIL result, which the
+  Exception-Detection layer raises. Nothing here moves the item back to Active.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .evidence import EvidenceRecord, VerificationResult
+from .evidence import EvidenceRecord, VerificationResult, VerificationStatus
 from .validation import InvalidEvidenceError, is_structurally_valid, validate_record
 
 
@@ -33,3 +36,11 @@ def attach_evidence(
 def may_complete(result: VerificationResult) -> bool:
     """T5 gate: the verification process may move Claimed Complete -> Complete only on PASS."""
     return result.passed
+
+
+VERIFICATION_FAILURE = "VERIFICATION_FAILURE"
+
+
+def failure_exception(result: VerificationResult) -> str | None:
+    """Exception type to raise for a FAIL result; None for PASS or unverified."""
+    return VERIFICATION_FAILURE if result.status is VerificationStatus.FAIL else None
