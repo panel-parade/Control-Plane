@@ -24,3 +24,7 @@ Implements Evidence-Spec §3 to §6 with no state writes.
 | Failed verification leaves the item in Claimed Complete and raises `VERIFICATION_FAILURE` (via `failure_exception`); no Claimed Complete → Active transition. | Preserves the worker's completion claim and the evidence trail; fix by attaching new evidence and re-verifying. | Return to Active. |
 | Module returns detail only; raising verification-delay exceptions is left to Exception-Detection. | Keeps this module free of state and scheduling. | Emit exceptions here. |
 | Reference formats are chosen here because the spec gives only examples (see `validation.py`). | Needed to implement structural validity. | Wait for a spec. |
+| Accepted: `required` and `human_dependent` are per-item booleans defaulting to `False`. | Simple v1 mechanism; recorded in the coordinator decision trail. | Enum or per-criterion config. |
+| Accepted: COMPLETE does not require Level 3 validation. | GUI validation is an oversight activity, not state progression. | Gate COMPLETE on Level 3. |
+| Accepted: missed handoff raises `OWNERSHIP_GAP` for v1; no new exception class without evidence. | Avoids unneeded exception classes. | New missed-handoff exception. |
+| Machine-readable done criteria deferred to a future issue ("Machine-readable done criteria"). | Typed `Check` objects are the v1 workaround. | Parse spec text now. |

@@ -1,17 +1,22 @@
 # Implementation
 
-## Stack decision
+## Stack (Stream A: Work Register and State Machine)
 
-Python 3.12, pytest, standard library only. Chosen because `test-harness/README.md` and the `implementation/*/README.md` files were empty on `main` and no stack was defined. No packaging metadata is added; tests put `implementation/` on `sys.path` via `test-harness/tests/verification/conftest.py`.
+No stack is defined by the merged `implementation/*/README.md` or `test-harness/README.md` (all empty on `main`), so Stream A uses:
+
+- Python 3.12
+- stdlib `sqlite3` for persistence
+- pytest for tests (`test-harness/`, run with `python -m pytest` from `test-harness/`)
 
 ## Layout
 
-- `implementation/verification/`: stream B evidence verification (Evidence-Spec). See its README.
-- `implementation/schema/`, `implementation/services/`: stream A (register and state machine). Owned by another stream; this stream has no import dependency on them.
-- `test-harness/tests/verification/`: tests for stream B.
+- `schema/`: DDL (`schema.sql`) and connection helpers (`db.py`).
+- `services/`: `register.py` (Work Register) and `state_machine.py` (transitions T1-T6).
+- `test-harness/tests/register/`: register and state machine tests.
 
-Run tests from the repo root:
+## Stack (Stream B: Evidence Verification)
 
-```
-python -m pytest test-harness/tests/verification -q
-```
+Same stack (Python 3.12, pytest, stdlib only). Stream B uses no import from stream A.
+
+- `verification/`: evidence verification (Evidence-Spec), see its README.
+- `test-harness/tests/verification/`: tests. Run from the repo root with `python -m pytest test-harness/tests/verification -q`.
