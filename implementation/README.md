@@ -24,3 +24,8 @@ Run tests from the repository root:
 - `test-harness/tests/exceptions_status/`: `conftest.py` puts `implementation/` on `sys.path`.
 
 `exceptions` and `status` are sibling top-level packages under `implementation/`, so imports are absolute (`from exceptions import ...`). Stream C does not import from `schema/`, `services/` or `verification/`. Its inputs arrive as the local mirror types in `implementation/exceptions/types.py`.
+
+### Stream B: Evidence Verification
+
+- `verification/`: evidence verification (Evidence-Spec), see its README.
+- `test-harness/tests/verification/`: tests. Run with `python -m pytest test-harness/tests/verification -q`.
