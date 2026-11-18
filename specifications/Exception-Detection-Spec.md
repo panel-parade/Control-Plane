@@ -15,7 +15,18 @@ Surface operational problems automatically from register data so no one has to w
 | `VERIFICATION_FAILURE` | Done criterion not satisfied | Evidence verification result |
 | `LONG_TERM_BLOCK` | Item `Blocked` beyond threshold | audit log (time entered Blocked) |
 
-Thresholds (`progress_gap_threshold`, `block_threshold`) are configurable; defaults are an open question.
+### Default thresholds
+
+Defaults are intentionally aggressive: Control Plane v1 assumes an autonomous worker environment where many work items complete in minutes rather than hours. Projects may override any default.
+
+| Threshold | Default | Human-Dependent Work |
+|---|---|---|
+| `ownership_gap` | immediate | immediate |
+| `progress_gap` | 10m | 1h |
+| `verification_delay` | 5m | — |
+| `long_term_block` | 30m | 24h |
+
+`verification_delay` is the maximum time an item may sit in `Claimed Complete` awaiting verification before raising a `VERIFICATION_FAILURE`. Human-dependent work is work whose progress depends on a human; how it is flagged on a work item is an open question.
 
 ## 3. Exception Record
 
@@ -40,7 +51,7 @@ Thresholds (`progress_gap_threshold`, `block_threshold`) are configurable; defau
 
 | Responder | Handles |
 |---|---|
-| Manager Layer (primary) | Ownership, progress, verification |
+| Manager Layer (primary) — Control Plane operational handling | Ownership, progress, verification |
 | Intent Owner (escalation only) | Project blocked beyond threshold; authority boundary reached; strategic intervention required |
 
 `LONG_TERM_BLOCK` goes to the Manager first and escalates to the Intent Owner when the project is blocked beyond threshold. Authority-boundary and strategic-decision escalations are raised explicitly by the Manager.
@@ -53,7 +64,7 @@ Thresholds (`progress_gap_threshold`, `block_threshold`) are configurable; defau
 
 ## 7. Open Questions
 
-1. Default thresholds; per-project variation?
+1. How is an item flagged as human-dependent (per item, per project)?
 2. Notification channel (belongs in `implementation/exceptions`).
 3. Definition of "project blocked" for escalation.
 4. Should `PROGRESS_GAP` apply to `Claimed Complete` items awaiting verification?

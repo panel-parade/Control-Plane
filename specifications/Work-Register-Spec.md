@@ -16,13 +16,14 @@ Out of scope: planning, decomposition, prioritisation, scheduling (deferred Phas
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `work_id` | string (immutable) | yes | Unique, never reused. |
+| `project_id` | string | yes | Groups work items into a project, e.g. `SEEK`, `SAGE`, `CONTROL-PLANE`. |
 | `assigned_to` | string \| null | yes (nullable) | Owner. Null is an Ownership Gap exception, not an invalid record. |
 | `state` | enum | yes | One of the states in the State-Machine Spec. Initial: `Assigned`. |
 | `done_criterion` | string | yes | Objective, verifiable (see Evidence Spec §6). Non-empty at creation. |
 | `evidence_ref` | string \| null | no | Reference(s) to attached evidence. Required to enter `Claimed Complete`. |
 | `last_update_ts` | timestamp (UTC) | yes | Set by the register on every accepted mutation. |
 
-Additional fields required by dependent specs (proposed, see Open Questions): `project_id`, `block_reason`, `required` (bool, used by Derived Status), `created_ts`.
+Additional fields required by dependent specs (proposed, see Open Questions): `block_reason`, `required` (bool, used by Derived Status), `created_ts`.
 
 ## 4. Audit Log
 
@@ -63,6 +64,5 @@ Audit entries are never updated or deleted. A state change and its audit entry a
 ## 8. Open Questions
 
 1. Persistence technology — deferred to `implementation/schema`.
-2. Is `project_id` (and programme grouping) required in v1? Derived Status is project-level, so assumed yes.
-3. Should `evidence_ref` be a single reference or a list? Evidence Spec assumes a list of evidence IDs.
-4. Do ownership changes require an audit entry? Proposed: yes, via a separate event type.
+2. Should `evidence_ref` be a single reference or a list? Evidence Spec assumes a list of evidence IDs.
+3. Do ownership changes require an audit entry? Proposed: yes, via a separate event type.

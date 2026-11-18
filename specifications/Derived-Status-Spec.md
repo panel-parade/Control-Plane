@@ -21,6 +21,8 @@ Only: work items (state, `required`), exception records, and evaluation time. No
 3. **AMBER** — any other open exception (e.g. `PROGRESS_GAP`), or any item currently `Blocked` below the long-term threshold.
 4. **GREEN** — otherwise: work progressing, evidence arriving, no exceptions.
 
+Outcome precedence: product behaviour outranks register state. A Level 3 finding that the product does not meet intent overrides a derived `COMPLETE` (see Evidence Spec, Outcome Validation).
+
 ## 5. Programme Roll-Up
 
 Worst of its projects by severity `RED > AMBER > GREEN`; `COMPLETE` only if all projects are `COMPLETE`.

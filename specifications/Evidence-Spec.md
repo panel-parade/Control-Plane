@@ -62,6 +62,10 @@ Verification is deterministic for given evidence and external state.
 | 2 | System evidence (commit, tests, artifact) | Automated by this spec |
 | 3 | Product reality (Intent Owner inspects running product) | Manual, during the operational trial |
 
+## Outcome Validation
+
+Product behaviour has precedence over register state when determining successful outcomes. If Level 3 inspection contradicts a `Complete` item, the product is authoritative and the register must be corrected (item reopened or exception raised).
+
 ## 8. Acceptance Criteria (Sprints 3–4)
 
 - Evidence can be attached, stored, and traced.
