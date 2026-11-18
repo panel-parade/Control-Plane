@@ -22,8 +22,9 @@ Out of scope: planning, decomposition, prioritisation, scheduling (deferred Phas
 | `done_criterion` | string | yes | Objective, verifiable (see Evidence Spec §6). Non-empty at creation. |
 | `evidence_ref` | string \| null | no | Reference(s) to attached evidence. Required to enter `Claimed Complete`. |
 | `last_update_ts` | timestamp (UTC) | yes | Set by the register on every accepted mutation. |
+| `required` | boolean | no (default `false`) | Indicates whether the work item contributes to project completion determination. |
 
-Additional fields required by dependent specs (proposed, see Open Questions): `block_reason`, `required` (bool, used by Derived Status), `created_ts`.
+Additional fields required by dependent specs (proposed, see Open Questions): `block_reason`, `created_ts`.
 
 ## 4. Audit Log
 
