@@ -15,6 +15,7 @@ ILLEGAL_TRANSITION = "ILLEGAL_TRANSITION"
 ACTOR_NOT_PERMITTED = "ACTOR_NOT_PERMITTED"
 EVIDENCE_MISSING = "EVIDENCE_MISSING"
 NOT_FOUND = "NOT_FOUND"
+VERIFICATION_FAILURE = "VERIFICATION_FAILURE"
 
 ROLES = ("worker", "manager", "system", "verifier")
 
@@ -137,26 +138,21 @@ class StateMachine:
             return _reject(work_id, EVIDENCE_MISSING, f"{rule.tid} requires {rule.evidence_kind}")
 
         now = utc_now()
-        block_reason_sql = "block_reason"
-        evidence_ref_sql = "evidence_ref"
-        params: list[object] = []
+        block_sql = "block_reason"
+        block_params: list[object] = []
         if rule.tid == "T2":
-            block_reason_sql = "?"
-            params.append(refs[0])
+            block_sql = "?"
+            block_params = [refs[0]]
         elif rule.tid == "T3":
-            block_reason_sql = "NULL"
-        if rule.tid == "T4":
-            evidence_ref_sql = "?"
-            params.append("\n".join(refs))
+            block_sql = "NULL"
 
         conn.execute("UPDATE register_guard SET allow_state_write = 1 WHERE id = 1")
         try:
             conn.execute(
                 f"""UPDATE work_items
-                    SET state = ?, block_reason = {block_reason_sql},
-                        evidence_ref = {evidence_ref_sql}, last_update_ts = ?
+                    SET state = ?, block_reason = {block_sql}, last_update_ts = ?
                     WHERE work_id = ?""",
-                [to_state, *params, now, work_id],
+                [to_state, *block_params, now, work_id],
             )
         finally:
             conn.execute("UPDATE register_guard SET allow_state_write = 0 WHERE id = 1")
@@ -167,5 +163,79 @@ class StateMachine:
                VALUES (?, 'TRANSITION', ?, ?, ?, ?)""",
             (work_id, from_state, to_state, actor.identity, now),
         )
+        if rule.tid == "T4":
+            self._attach_evidence(work_id, cursor.lastrowid, refs)
         return TransitionResult(
             accepted=True, work_id=work_id, new_state=to_state, audit_id=cursor.lastrowid)
+
+    def verification_failed(
+        self,
+        work_id: str,
+        actor: Actor,
+        evidence: Evidence = None,
+    ) -> TransitionResult:
+        """Record a failed verification of a Claimed Complete item.
+
+        The state stays ``Claimed Complete`` (no transition). One ``VERIFICATION_FAILURE``
+        audit entry is written atomically with the attached evidence. Rejections mutate nothing.
+        """
+        conn = self._conn
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            result = self._apply_verification_failure(work_id, actor, evidence)
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        if result.accepted:
+            conn.execute("COMMIT")
+        else:
+            conn.execute("ROLLBACK")
+        return result
+
+    def _apply_verification_failure(
+        self, work_id: str, actor: Actor, evidence: Evidence
+    ) -> TransitionResult:
+        conn = self._conn
+        row = conn.execute(
+            "SELECT state FROM work_items WHERE work_id = ?", (work_id,)
+        ).fetchone()
+        if row is None:
+            return _reject(work_id, NOT_FOUND, f"work item {work_id!r} does not exist")
+        if row["state"] != "Claimed Complete":
+            return _reject(
+                work_id, ILLEGAL_TRANSITION,
+                f"{VERIFICATION_FAILURE} is only valid from 'Claimed Complete', not {row['state']!r}")
+        if actor.role != "verifier":
+            return _reject(
+                work_id, ACTOR_NOT_PERMITTED,
+                f"role {actor.role!r} may not record {VERIFICATION_FAILURE}")
+        refs = _normalise_evidence(evidence)
+        if not refs:
+            return _reject(
+                work_id, EVIDENCE_MISSING, f"{VERIFICATION_FAILURE} requires verification evidence")
+
+        now = utc_now()
+        cursor = conn.execute(
+            """INSERT INTO audit_log
+               (work_id, event_type, old_state, new_state, actor, timestamp)
+               VALUES (?, 'VERIFICATION_FAILURE', 'Claimed Complete', 'Claimed Complete', ?, ?)""",
+            (work_id, actor.identity, now),
+        )
+        self._attach_evidence(work_id, cursor.lastrowid, refs)
+        conn.execute(
+            "UPDATE work_items SET last_update_ts = ? WHERE work_id = ?", (now, work_id))
+        return TransitionResult(
+            accepted=True, work_id=work_id, new_state="Claimed Complete",
+            audit_id=cursor.lastrowid, reason_code=VERIFICATION_FAILURE)
+
+    def _attach_evidence(self, work_id: str, audit_id: int, refs: list[str]) -> None:
+        conn = self._conn
+        seq = conn.execute(
+            "SELECT COALESCE(MAX(seq), 0) FROM evidence_refs WHERE work_id = ?", (work_id,)
+        ).fetchone()[0]
+        conn.executemany(
+            """INSERT INTO evidence_refs (work_id, seq, audit_id, evidence_id)
+               VALUES (?, ?, ?, ?)""",
+            [(work_id, seq + i, audit_id, ref) for i, ref in enumerate(refs, start=1)],
+        )
+

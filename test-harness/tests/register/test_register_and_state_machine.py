@@ -12,6 +12,7 @@ from services.state_machine import (
     EVIDENCE_MISSING,
     ILLEGAL_TRANSITION,
     NOT_FOUND,
+    VERIFICATION_FAILURE,
     Actor,
     StateMachine,
 )
@@ -109,6 +110,58 @@ def test_any_nonempty_reference_satisfies_t4_structure(env):
     _, sm, _ = env
     sm.transition("W-1", "Active", WORKER, ["started"])
     assert sm.transition("W-1", "Claimed Complete", WORKER, ["sha:abc"]).accepted
+
+
+def test_evidence_is_stored_as_ordered_list(env):
+    register, sm, _ = env
+    sm.transition("W-1", "Active", WORKER, ["started"])
+    assert sm.transition("W-1", "Claimed Complete", WORKER, ["sha:abc", "tests:pass"]).accepted
+    assert register.get("W-1").evidence_refs == ("sha:abc", "tests:pass")
+
+
+def test_verification_failure_keeps_claimed_complete_and_audits_once(env):
+    register, sm, db = env
+    sm.transition("W-1", "Active", WORKER, ["started"])
+    sm.transition("W-1", "Claimed Complete", WORKER, ["sha:abc"])
+    audits_before = db.execute("SELECT COUNT(*) FROM audit_log WHERE work_id='W-1'").fetchone()[0]
+    result = sm.verification_failed("W-1", VERIFIER, ["tests:fail"])
+    assert result.accepted
+    assert result.reason_code == VERIFICATION_FAILURE
+    item = register.get("W-1")
+    assert item.state == "Claimed Complete"
+    assert item.evidence_refs == ("sha:abc", "tests:fail")
+    audits = db.execute(
+        "SELECT event_type, old_state, new_state FROM audit_log WHERE work_id='W-1' ORDER BY audit_id"
+    ).fetchall()
+    assert len(audits) == audits_before + 1
+    assert tuple(audits[-1]) == ("VERIFICATION_FAILURE", "Claimed Complete", "Claimed Complete")
+
+
+def test_verification_failure_is_verifier_only_and_leaves_state_unchanged(env):
+    _, sm, db = env
+    sm.transition("W-1", "Active", WORKER, ["started"])
+    sm.transition("W-1", "Claimed Complete", WORKER, ["sha:abc"])
+    before = snapshot(db)
+    assert sm.verification_failed("W-1", WORKER, ["tests:fail"]).reason_code == ACTOR_NOT_PERMITTED
+    assert snapshot(db) == before
+
+
+def test_verification_failure_requires_claimed_complete(env):
+    _, sm, db = env
+    sm.transition("W-1", "Active", WORKER, ["started"])
+    before = snapshot(db)
+    assert sm.verification_failed("W-1", VERIFIER, ["tests:fail"]).reason_code == ILLEGAL_TRANSITION
+    assert snapshot(db) == before
+
+
+def test_verification_failure_requires_evidence_and_known_item(env):
+    _, sm, db = env
+    sm.transition("W-1", "Active", WORKER, ["started"])
+    sm.transition("W-1", "Claimed Complete", WORKER, ["sha:abc"])
+    before = snapshot(db)
+    assert sm.verification_failed("W-1", VERIFIER, None).reason_code == EVIDENCE_MISSING
+    assert snapshot(db) == before
+    assert sm.verification_failed("missing", VERIFIER, ["tests:fail"]).reason_code == NOT_FOUND
 
 
 def test_not_found_writes_nothing(db):

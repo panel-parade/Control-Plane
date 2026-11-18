@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS work_items (
                        'Assigned', 'Active', 'Blocked',
                        'Claimed Complete', 'Complete', 'Archived')),
     done_criterion TEXT NOT NULL CHECK (length(trim(done_criterion)) > 0),
-    evidence_ref   TEXT,
     block_reason   TEXT,
     required       INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0, 1)),
     created_ts     TEXT NOT NULL,
@@ -24,7 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_work_items_last_update_ts ON work_items (last_upd
 CREATE TABLE IF NOT EXISTS audit_log (
     audit_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     work_id    TEXT NOT NULL REFERENCES work_items (work_id),
-    event_type TEXT NOT NULL CHECK (event_type IN ('CREATE', 'ASSIGNMENT', 'TRANSITION')),
+    event_type TEXT NOT NULL CHECK (event_type IN (
+                   'CREATE', 'ASSIGNMENT', 'TRANSITION', 'VERIFICATION_FAILURE')),
     old_state  TEXT,
     new_state  TEXT NOT NULL,
     actor      TEXT NOT NULL CHECK (length(actor) > 0),
@@ -44,6 +44,28 @@ CREATE TRIGGER IF NOT EXISTS audit_log_no_delete
 BEFORE DELETE ON audit_log
 BEGIN
     SELECT RAISE(ABORT, 'audit_log is append-only');
+END;
+
+-- evidence_ref is a list of evidence records per work item, in order of attachment.
+-- Each record is linked to the audit entry that attached it and is append-only.
+CREATE TABLE IF NOT EXISTS evidence_refs (
+    work_id     TEXT NOT NULL REFERENCES work_items (work_id),
+    seq         INTEGER NOT NULL CHECK (seq >= 1),
+    audit_id    INTEGER NOT NULL REFERENCES audit_log (audit_id),
+    evidence_id TEXT NOT NULL CHECK (length(trim(evidence_id)) > 0),
+    PRIMARY KEY (work_id, seq)
+);
+
+CREATE TRIGGER IF NOT EXISTS evidence_refs_no_update
+BEFORE UPDATE ON evidence_refs
+BEGIN
+    SELECT RAISE(ABORT, 'evidence_refs is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS evidence_refs_no_delete
+BEFORE DELETE ON evidence_refs
+BEGIN
+    SELECT RAISE(ABORT, 'evidence_refs is append-only');
 END;
 
 -- Direct writes to state are prohibited: only the state machine may set it.

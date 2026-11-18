@@ -24,21 +24,21 @@ class WorkItem:
     assigned_to: Optional[str]
     state: str
     done_criterion: str
-    evidence_ref: Optional[str]
+    evidence_refs: tuple[str, ...]  # ordered list of evidence records, may be empty
     block_reason: Optional[str]
     required: bool
     created_ts: str
     last_update_ts: str
 
 
-def _row_to_item(row: sqlite3.Row) -> WorkItem:
+def _row_to_item(row: sqlite3.Row, evidence_refs: tuple[str, ...]) -> WorkItem:
     return WorkItem(
         work_id=row["work_id"],
         project_id=row["project_id"],
         assigned_to=row["assigned_to"],
         state=row["state"],
         done_criterion=row["done_criterion"],
-        evidence_ref=row["evidence_ref"],
+        evidence_refs=evidence_refs,
         block_reason=row["block_reason"],
         required=bool(row["required"]),
         created_ts=row["created_ts"],
@@ -73,8 +73,8 @@ class Register:
             conn.execute(
                 """INSERT INTO work_items
                    (work_id, project_id, assigned_to, state, done_criterion,
-                    evidence_ref, block_reason, required, created_ts, last_update_ts)
-                   VALUES (?, ?, ?, 'Assigned', ?, NULL, NULL, ?, ?, ?)""",
+                    block_reason, required, created_ts, last_update_ts)
+                   VALUES (?, ?, ?, 'Assigned', ?, NULL, ?, ?, ?)""",
                 (work_id, project_id, assigned_to, done_criterion, int(required), now, now),
             )
             conn.execute(
@@ -118,11 +118,17 @@ class Register:
             raise
         return self.get(work_id)
 
+    def _load_refs(self, work_id: str) -> tuple[str, ...]:
+        rows = self._conn.execute(
+            "SELECT evidence_id FROM evidence_refs WHERE work_id = ? ORDER BY seq", (work_id,)
+        ).fetchall()
+        return tuple(r["evidence_id"] for r in rows)
+
     def get(self, work_id: str) -> Optional[WorkItem]:
         row = self._conn.execute(
             "SELECT * FROM work_items WHERE work_id = ?", (work_id,)
         ).fetchone()
-        return _row_to_item(row) if row else None
+        return _row_to_item(row, self._load_refs(work_id)) if row else None
 
     def query(
         self,
@@ -156,7 +162,7 @@ class Register:
         rows = self._conn.execute(
             f"SELECT * FROM work_items{where} ORDER BY work_id", params
         ).fetchall()
-        return [_row_to_item(r) for r in rows]
+        return [_row_to_item(r, self._load_refs(r["work_id"])) for r in rows]
 
     def audit_entries(self, work_id: str) -> list[sqlite3.Row]:
         return self._conn.execute(
