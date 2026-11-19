@@ -23,8 +23,10 @@ def db():
 @pytest.fixture
 def env(db):
     register = Register(db)
-    register.create("W-1", "CONTROL-PLANE", "commit on origin AND tests pass", "mgr", assigned_to="alice")
-    register.create("W-2", "CONTROL-PLANE", "docs updated", "mgr", assigned_to="alice")
+    register.create("W-1", "CONTROL-PLANE", "commit on origin AND tests pass", "mgr", assigned_to="alice",
+                    item_type="Execution")
+    register.create("W-2", "CONTROL-PLANE", "docs updated", "mgr", assigned_to="alice",
+                    item_type="Execution")
     return ObservationRegistry(db, intent_owners={"CONTROL-PLANE": INTENT_OWNER})
 
 
@@ -90,7 +92,7 @@ def test_governance_kind_requires_intent_owner(env, kind):
 
 def test_governance_kind_rejected_when_project_has_no_intent_owner(db):
     registry = ObservationRegistry(db)
-    Register(db).create("W-3", "OTHER", "criterion", "mgr", assigned_to="alice")
+    Register(db).create("W-3", "OTHER", "criterion", "mgr", assigned_to="alice", item_type="Execution")
     obs = registry.record("OTHER", "policy", "policy point", "alice", work_id="W-3")
     with pytest.raises(PermissionError):
         registry.resolve(obs.observation_id, "owner", "manager")
