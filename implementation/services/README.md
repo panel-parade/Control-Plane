@@ -10,14 +10,14 @@ result = sm.transition(work_id, to_state, actor, evidence)
 ```
 
 - `work_id`: str. `to_state`: one of the register states.
-- `actor`: `Actor(identity, role)`, role in `worker`, `manager`, `system`, `verifier`.
+- `actor`: `Actor(identity, role)`, role in `worker`, `manager`, `system`, `verifier`, `intent_owner`.
 - `evidence`: `None`, a string, or a list of strings. Each non-blank string is appended, in order, as one evidence record in `WorkItem.evidence_refs` (T4 attaches the list; a done criterion may need several records). Blank or missing evidence is `EVIDENCE_MISSING`.
 - Returns `TransitionResult(accepted, work_id, new_state, audit_id, reason_code, detail)`.
 - Rejections never mutate the register and write no audit entry. `reason_code` is one of `NOT_FOUND`, `ILLEGAL_TRANSITION`, `ACTOR_NOT_PERMITTED`, `EVIDENCE_MISSING`.
 - Accepted transitions write exactly one `TRANSITION` audit row in the same transaction as the state change.
 - Transitions are the only supported way to change `state`. Direct writes are blocked by a trigger unless the state machine has set its guard inside its own transaction.
 
-Transition table (`TRANSITIONS` in `state_machine.py`): T1-T6, see the State Machine Spec. Claimed Complete -> Active is not in the table and is rejected as `ILLEGAL_TRANSITION`.
+Transition table (`TRANSITIONS` in `state_machine.py`): T1-T7, see the State Machine Spec. T7 (`Assigned -> Claimed Complete`) is Intent Owner only, requires decision evidence, and applies only to decision items (inferred from the done criterion containing "decision", pending spec Open Question 6 and #32). T5 remains the only route to `Complete`. Claimed Complete -> Active is not in the table and is rejected as `ILLEGAL_TRANSITION`.
 
 ### Failed verification: `StateMachine.verification_failed`
 

@@ -5,6 +5,7 @@ See specifications/State-Machine-Spec.md (T1-T6) and Evidence-Spec §5.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from typing import Iterable, Optional, Union
@@ -17,7 +18,15 @@ EVIDENCE_MISSING = "EVIDENCE_MISSING"
 NOT_FOUND = "NOT_FOUND"
 VERIFICATION_FAILURE = "VERIFICATION_FAILURE"
 
-ROLES = ("worker", "manager", "system", "verifier")
+ROLES = ("worker", "manager", "system", "verifier", "intent_owner")
+
+# State-Machine-Spec Open Question 6: until an explicit item type exists (#32),
+# a decision item is inferred from its done criterion. Assumption: the word "decision".
+_DECISION_CRITERION = re.compile(r"\bdecision\b", re.IGNORECASE)
+
+
+def is_decision_item(done_criterion: str) -> bool:
+    return bool(_DECISION_CRITERION.search(done_criterion))
 
 Evidence = Optional[Union[str, Iterable[str]]]
 
@@ -38,7 +47,7 @@ class TransitionRule:
     evidence_kind: str  # human-readable requirement, used in EVIDENCE_MISSING messages
 
 
-# T1-T6 from State-Machine-Spec §3. Any (from, to) pair not listed is ILLEGAL_TRANSITION.
+# T1-T7 from State-Machine-Spec v0.2 §3. Any (from, to) pair not listed is ILLEGAL_TRANSITION.
 TRANSITIONS: dict[tuple[str, str], TransitionRule] = {
     ("Assigned", "Active"): TransitionRule(
         "T1", "Assigned", "Active", frozenset({"worker"}), True, "activity reference"),
@@ -53,6 +62,9 @@ TRANSITIONS: dict[tuple[str, str], TransitionRule] = {
         "done criterion satisfied"),
     ("Complete", "Archived"): TransitionRule(
         "T6", "Complete", "Archived", frozenset({"manager", "system"}), False, "closure rule reference"),
+    # T7 does not set Complete (Rule 2); T5 remains the only route to Complete.
+    ("Assigned", "Claimed Complete"): TransitionRule(
+        "T7", "Assigned", "Claimed Complete", frozenset({"intent_owner"}), False, "decision record"),
 }
 
 
@@ -112,7 +124,8 @@ class StateMachine:
     def _apply(self, work_id: str, to_state: str, actor: Actor, evidence: Evidence) -> TransitionResult:
         conn = self._conn
         row = conn.execute(
-            "SELECT state, assigned_to FROM work_items WHERE work_id = ?", (work_id,)
+            "SELECT state, assigned_to, done_criterion FROM work_items WHERE work_id = ?",
+            (work_id,),
         ).fetchone()
         if row is None:
             return _reject(work_id, NOT_FOUND, f"work item {work_id!r} does not exist")
@@ -121,7 +134,10 @@ class StateMachine:
         rule = TRANSITIONS.get((from_state, to_state))
         if to_state not in STATES or rule is None:
             return _reject(
-                work_id, ILLEGAL_TRANSITION, f"{from_state!r} -> {to_state!r} is not in T1-T6")
+                work_id, ILLEGAL_TRANSITION, f"{from_state!r} -> {to_state!r} is not in T1-T7")
+        if rule.tid == "T7" and not is_decision_item(row["done_criterion"]):
+            return _reject(
+                work_id, ILLEGAL_TRANSITION, "T7 applies only to decision items")
 
         if actor.role not in ROLES or actor.role not in rule.allowed_roles:
             return _reject(
@@ -163,7 +179,7 @@ class StateMachine:
                VALUES (?, 'TRANSITION', ?, ?, ?, ?)""",
             (work_id, from_state, to_state, actor.identity, now),
         )
-        if rule.tid == "T4":
+        if rule.tid in ("T4", "T7"):
             self._attach_evidence(work_id, cursor.lastrowid, refs)
         return TransitionResult(
             accepted=True, work_id=work_id, new_state=to_state, audit_id=cursor.lastrowid)
