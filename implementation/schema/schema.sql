@@ -90,3 +90,58 @@ BEFORE DELETE ON work_items
 BEGIN
     SELECT RAISE(ABORT, 'work items cannot be deleted');
 END;
+
+-- Observation Registry (Observation-Registry-Spec). Separate from the Work Register:
+-- recording or resolving never changes work_items or audit_log.
+CREATE TABLE IF NOT EXISTS observations (
+    observation_id TEXT PRIMARY KEY NOT NULL CHECK (length(observation_id) > 0),
+    project_id     TEXT NOT NULL CHECK (length(project_id) > 0),
+    work_id        TEXT REFERENCES work_items (work_id),
+    kind           TEXT NOT NULL CHECK (kind IN (
+                       'missing_artefact', 'duplicate_detected', 'stale_reference',
+                       'verification_issue', 'reproduction_issue', 'spec_gap',
+                       'decision', 'validation', 'policy', 'authority',
+                       'ratification', 'strategic_direction')),
+    detail         TEXT NOT NULL CHECK (length(trim(detail)) > 0),
+    reference      TEXT,
+    recorded_by    TEXT NOT NULL CHECK (length(recorded_by) > 0),
+    recorded_ts    TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+    resolved_by    TEXT,
+    resolved_ts    TEXT,
+    CHECK (
+        (status = 'open' AND resolved_by IS NULL AND resolved_ts IS NULL)
+        OR (status = 'resolved' AND resolved_by IS NOT NULL AND resolved_ts IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_observations_work_id ON observations (work_id);
+CREATE INDEX IF NOT EXISTS idx_observations_project_id ON observations (project_id);
+CREATE INDEX IF NOT EXISTS idx_observations_kind ON observations (kind);
+CREATE INDEX IF NOT EXISTS idx_observations_status ON observations (status);
+
+-- Observations are never deleted.
+CREATE TRIGGER IF NOT EXISTS observations_no_delete
+BEFORE DELETE ON observations
+BEGIN
+    SELECT RAISE(ABORT, 'observations cannot be deleted');
+END;
+
+-- The only permitted update is open -> resolved, which may change only
+-- status, resolved_by and resolved_ts. Everything else is immutable.
+CREATE TRIGGER IF NOT EXISTS observations_update_guard
+BEFORE UPDATE ON observations
+WHEN NOT (
+    OLD.status = 'open' AND NEW.status = 'resolved'
+    AND NEW.observation_id IS OLD.observation_id
+    AND NEW.project_id IS OLD.project_id
+    AND NEW.work_id IS OLD.work_id
+    AND NEW.kind IS OLD.kind
+    AND NEW.detail IS OLD.detail
+    AND NEW.reference IS OLD.reference
+    AND NEW.recorded_by IS OLD.recorded_by
+    AND NEW.recorded_ts IS OLD.recorded_ts
+)
+BEGIN
+    SELECT RAISE(ABORT, 'observations are append-only; only open -> resolved is permitted');
+END;
