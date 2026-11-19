@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from services.item_types import validate_item_type
+
 STATES = ("Assigned", "Active", "Blocked", "Claimed Complete", "Complete", "Archived")
 
 
@@ -29,6 +31,7 @@ class WorkItem:
     required: bool
     created_ts: str
     last_update_ts: str
+    item_type: Optional[str] = None  # None only for legacy rows not yet backfilled
 
 
 def _row_to_item(row: sqlite3.Row, evidence_refs: tuple[str, ...]) -> WorkItem:
@@ -43,6 +46,7 @@ def _row_to_item(row: sqlite3.Row, evidence_refs: tuple[str, ...]) -> WorkItem:
         required=bool(row["required"]),
         created_ts=row["created_ts"],
         last_update_ts=row["last_update_ts"],
+        item_type=row["item_type"],
     )
 
 
@@ -58,14 +62,20 @@ class Register:
         actor: str,
         assigned_to: Optional[str] = None,
         required: bool = False,
+        *,
+        item_type: Optional[str],
     ) -> WorkItem:
-        """Create a work item in state ``Assigned`` with one ``CREATE`` audit entry."""
+        """Create a work item in state ``Assigned`` with one ``CREATE`` audit entry.
+
+        ``item_type`` is mandatory; a missing or invalid type raises ValueError (TYPE_MISSING / TYPE_INVALID).
+        """
         if not work_id or not work_id.strip():
             raise ValueError("work_id is required")
         if not project_id or not project_id.strip():
             raise ValueError("project_id is required")
         if not done_criterion or not done_criterion.strip():
             raise ValueError("done_criterion must be non-empty")
+        validate_item_type(item_type)
         now = utc_now()
         conn = self._conn
         conn.execute("BEGIN IMMEDIATE")
@@ -73,9 +83,10 @@ class Register:
             conn.execute(
                 """INSERT INTO work_items
                    (work_id, project_id, assigned_to, state, done_criterion,
-                    block_reason, required, created_ts, last_update_ts)
-                   VALUES (?, ?, ?, 'Assigned', ?, NULL, ?, ?, ?)""",
-                (work_id, project_id, assigned_to, done_criterion, int(required), now, now),
+                    block_reason, required, created_ts, last_update_ts, item_type)
+                   VALUES (?, ?, ?, 'Assigned', ?, NULL, ?, ?, ?, ?)""",
+                (work_id, project_id, assigned_to, done_criterion, int(required), now, now,
+                 item_type),
             )
             conn.execute(
                 """INSERT INTO audit_log
@@ -88,6 +99,26 @@ class Register:
             conn.execute("ROLLBACK")
             raise
         return self.get(work_id)
+
+    def set_item_type(self, work_id: str, item_type: str) -> WorkItem:
+        """Backfill the type of a legacy item whose type is NULL. Recorded types are immutable (trigger)."""
+        validate_item_type(item_type)
+        item = self.get(work_id)
+        if item is None:
+            raise KeyError(work_id)
+        if item.item_type is not None:
+            raise ValueError(f"item_type already recorded as {item.item_type!r}")
+        self._conn.execute(
+            "UPDATE work_items SET item_type = ? WHERE work_id = ? AND item_type IS NULL",
+            (item_type, work_id),
+        )
+        return self.get(work_id)
+
+    def untyped(self) -> list[WorkItem]:
+        """Read-only flag: items with no recorded type (legacy rows awaiting backfill)."""
+        rows = self._conn.execute(
+            "SELECT * FROM work_items WHERE item_type IS NULL ORDER BY work_id").fetchall()
+        return [_row_to_item(r, self._load_refs(r["work_id"])) for r in rows]
 
     def assign(self, work_id: str, assigned_to: Optional[str], actor: str) -> WorkItem:
         """Set the owner (or clear it, creating an Ownership Gap) with an ``ASSIGNMENT`` audit entry."""

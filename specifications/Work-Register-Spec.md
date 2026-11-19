@@ -20,6 +20,7 @@ Out of scope: planning, decomposition, prioritisation, scheduling (deferred Phas
 | `assigned_to` | string \| null | yes (nullable) | Owner. Null is an Ownership Gap exception, not an invalid record. |
 | `state` | enum | yes | One of the states in the State-Machine Spec. Initial: `Assigned`. |
 | `done_criterion` | string | yes | Objective, verifiable (see Evidence Spec §6). Non-empty at creation. |
+| `item_type` | enum | yes | One of `Decision`, `Validation`, `Execution`, `Observation`, `Exception`. Set at creation and immutable once recorded. Missing or non-type labels (e.g. "Plain Text") are rejected as `TYPE_MISSING`. Legacy rows without a type are flagged, not inferred, until backfilled. |
 | `evidence_ref` | string \| null | no | Reference(s) to attached evidence. Required to enter `Claimed Complete`. |
 | `last_update_ts` | timestamp (UTC) | yes | Set by the register on every accepted mutation. |
 | `required` | boolean | no (default `false`) | Indicates whether the work item contributes to project completion determination. |
@@ -43,7 +44,7 @@ Audit entries are never updated or deleted. A state change and its audit entry a
 
 ## 5. Operations
 
-- **Create** — requires `work_id`, `done_criterion`; state `Assigned`; `assigned_to` may be null. Writes an audit entry (`null → Assigned`).
+- **Create** — requires `work_id`, `done_criterion`, `item_type`; state `Assigned`; `assigned_to` may be null. Writes an audit entry (`null → Assigned`).
 - **Assign / Reassign** — sets `assigned_to`; updates `last_update_ts`.
 - **Query** — by `work_id`, `assigned_to`, `state`, `project_id`, `last_update_ts` range. Read-only, side-effect free.
 - **Transition** — only via the State Machine (see State-Machine Spec). Direct writes to `state` are prohibited.

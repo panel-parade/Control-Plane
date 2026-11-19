@@ -16,7 +16,6 @@ from services.state_machine import (
     ILLEGAL_TRANSITION,
     Actor,
     StateMachine,
-    is_decision_item,
 )
 
 ROLE_IDENTITY = {
@@ -84,6 +83,7 @@ def make_item(db, state, is_decision):
         "W-1", "CONTROL-PLANE",
         DECISION_CRITERION if is_decision else EXECUTION_CRITERION,
         "mgr", assigned_to=OWNER,
+        item_type="Decision" if is_decision else "Execution",
     )
     sm = StateMachine(db)
     for role, to_state in PATHS[state]:
@@ -129,18 +129,9 @@ def test_spec_matrix(db, from_state, to_state, role, has_evidence, is_decision):
         assert snapshot(db) == before
 
 
-@pytest.mark.parametrize("criterion, expected", [
-    (DECISION_CRITERION, True),
-    ("Decision record filed for the programme", True),
-    (EXECUTION_CRITERION, False),
-])
-def test_decision_item_inference_from_done_criterion(criterion, expected):
-    # Assumption pending State-Machine-Spec Open Question 6 and issue #32.
-    assert is_decision_item(criterion) is expected
-
-
 def test_t7_decision_path_then_t5_is_only_route_to_complete(db):
-    Register(db).create("W-1", "CONTROL-PLANE", DECISION_CRITERION, "mgr", assigned_to=OWNER)
+    Register(db).create("W-1", "CONTROL-PLANE", DECISION_CRITERION, "mgr", assigned_to=OWNER,
+                        item_type="Decision")
     sm = StateMachine(db)
     intent_owner = Actor("lucien", "intent_owner")
 

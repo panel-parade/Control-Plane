@@ -34,7 +34,8 @@ def db():
 @pytest.fixture
 def env(db):
     register = Register(db)
-    register.create("W-1", "CONTROL-PLANE", "commit on origin AND tests pass", "mgr", assigned_to="alice")
+    register.create("W-1", "CONTROL-PLANE", "commit on origin AND tests pass", "mgr", assigned_to="alice",
+                    item_type="Execution")
     return register, StateMachine(db), db
 
 
@@ -89,7 +90,7 @@ def test_non_owner_cannot_start_work(env):
 
 
 def test_t1_rejected_when_owner_is_null(db):
-    Register(db).create("W-2", "CONTROL-PLANE", "done", "mgr", assigned_to=None)
+    Register(db).create("W-2", "CONTROL-PLANE", "done", "mgr", assigned_to=None, item_type="Execution")
     result = StateMachine(db).transition("W-2", "Active", WORKER, ["started"])
     assert result.reason_code == ACTOR_NOT_PERMITTED
     assert db.execute("SELECT state FROM work_items WHERE work_id='W-2'").fetchone()[0] == "Assigned"

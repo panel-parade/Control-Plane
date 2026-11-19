@@ -17,7 +17,7 @@ result = sm.transition(work_id, to_state, actor, evidence)
 - Accepted transitions write exactly one `TRANSITION` audit row in the same transaction as the state change.
 - Transitions are the only supported way to change `state`. Direct writes are blocked by a trigger unless the state machine has set its guard inside its own transaction.
 
-Transition table (`TRANSITIONS` in `state_machine.py`): T1-T7, see the State Machine Spec. T7 (`Assigned -> Claimed Complete`) is Intent Owner only, requires decision evidence, and applies only to decision items (inferred from the done criterion containing "decision", pending spec Open Question 6 and #32). T5 remains the only route to `Complete`. Claimed Complete -> Active is not in the table and is rejected as `ILLEGAL_TRANSITION`.
+Transition table (`TRANSITIONS` in `state_machine.py`): T1-T7, see the State Machine Spec. T7 (`Assigned -> Claimed Complete`) is Intent Owner only, requires decision evidence, and applies only to items whose explicit `item_type` is `Decision` (#32); an untyped item is rejected as `TYPE_MISSING`. T5 remains the only route to `Complete`. Claimed Complete -> Active is not in the table and is rejected as `ILLEGAL_TRANSITION`.
 
 ### Failed verification: `StateMachine.verification_failed`
 
@@ -38,7 +38,7 @@ result = sm.verification_failed(work_id, actor, evidence)
 from services.register import Register
 
 reg = Register(connection)
-reg.create(work_id, project_id, done_criterion, actor, assigned_to=None, required=False)  # writes a CREATE audit entry
+reg.create(work_id, project_id, done_criterion, actor, *, item_type, assigned_to=None, required=False)  # item_type: Decision | Validation | Execution | Observation | Exception; writes a CREATE audit entry
 reg.assign(work_id, assigned_to, actor)   # writes an ASSIGNMENT audit entry; KeyError if unknown
 reg.get(work_id)                          # WorkItem or None
 reg.query(work_id=, assigned_to=, state=, project_id=, last_update_ts_from=, last_update_ts_to=)  # list of WorkItem, read-only
