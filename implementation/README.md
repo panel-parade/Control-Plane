@@ -14,8 +14,9 @@ Run tests from the repository root:
 ### Stream A: Work Register and State Machine
 
 - `schema/`: DDL (`schema.sql`) and connection helpers (`db.py`).
-- `services/`: `register.py` (Work Register) and `state_machine.py` (transitions T1-T6).
+- `services/`: `register.py` (Work Register), `state_machine.py` (transitions T1-T6) and `observations.py` (Observation Registry, v1.1 Phases A and B; spec in `specifications/Observation-Registry-Spec.md`).
 - `test-harness/tests/register/`: register and state machine tests.
+- `test-harness/tests/observations/`: Observation Registry tests. Run with `python -m pytest test-harness/tests/observations -q`.
 
 ### Stream C: Exception Detection and Derived Status
 
