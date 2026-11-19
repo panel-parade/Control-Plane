@@ -8,6 +8,7 @@ Run tests from the repository root:
 
 - Stream A: `python -m pytest test-harness/tests/register -q`
 - Stream C: `python -m pytest test-harness/tests/exceptions_status -q`
+- Vertical slice CLI: `python -m pytest test-harness/tests/vertical_slice -q` (see `implementation/cli/README.md`)
 
 ## Layout
 
