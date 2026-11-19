@@ -5,11 +5,11 @@ See specifications/State-Machine-Spec.md (T1-T6) and Evidence-Spec §5.
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from dataclasses import dataclass
 from typing import Iterable, Optional, Union
 
+from services.item_types import TYPE_MISSING
 from services.register import STATES, utc_now
 
 ILLEGAL_TRANSITION = "ILLEGAL_TRANSITION"
@@ -19,14 +19,6 @@ NOT_FOUND = "NOT_FOUND"
 VERIFICATION_FAILURE = "VERIFICATION_FAILURE"
 
 ROLES = ("worker", "manager", "system", "verifier", "intent_owner")
-
-# State-Machine-Spec Open Question 6: until an explicit item type exists (#32),
-# a decision item is inferred from its done criterion. Assumption: the word "decision".
-_DECISION_CRITERION = re.compile(r"\bdecision\b", re.IGNORECASE)
-
-
-def is_decision_item(done_criterion: str) -> bool:
-    return bool(_DECISION_CRITERION.search(done_criterion))
 
 Evidence = Optional[Union[str, Iterable[str]]]
 
@@ -124,7 +116,7 @@ class StateMachine:
     def _apply(self, work_id: str, to_state: str, actor: Actor, evidence: Evidence) -> TransitionResult:
         conn = self._conn
         row = conn.execute(
-            "SELECT state, assigned_to, done_criterion FROM work_items WHERE work_id = ?",
+            "SELECT state, assigned_to, item_type FROM work_items WHERE work_id = ?",
             (work_id,),
         ).fetchone()
         if row is None:
@@ -135,9 +127,12 @@ class StateMachine:
         if to_state not in STATES or rule is None:
             return _reject(
                 work_id, ILLEGAL_TRANSITION, f"{from_state!r} -> {to_state!r} is not in T1-T7")
-        if rule.tid == "T7" and not is_decision_item(row["done_criterion"]):
-            return _reject(
-                work_id, ILLEGAL_TRANSITION, "T7 applies only to decision items")
+        if rule.tid == "T7":
+            if row["item_type"] is None:
+                return _reject(work_id, TYPE_MISSING, "T7 requires a recorded item type")
+            if row["item_type"] != "Decision":
+                return _reject(
+                    work_id, ILLEGAL_TRANSITION, "T7 applies only to Decision items")
 
         if actor.role not in ROLES or actor.role not in rule.allowed_roles:
             return _reject(

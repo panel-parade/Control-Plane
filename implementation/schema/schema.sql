@@ -12,8 +12,19 @@ CREATE TABLE IF NOT EXISTS work_items (
     block_reason   TEXT,
     required       INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0, 1)),
     created_ts     TEXT NOT NULL,
-    last_update_ts TEXT NOT NULL
+    last_update_ts TEXT NOT NULL,
+    -- NULL only for legacy rows awaiting backfill; new rows must set it (services/item_types.py).
+    item_type      TEXT CHECK (item_type IN (
+                       'Decision', 'Validation', 'Execution', 'Observation', 'Exception'))
 );
+
+-- A recorded item type cannot be changed.
+CREATE TRIGGER IF NOT EXISTS work_items_item_type_guard
+BEFORE UPDATE OF item_type ON work_items
+WHEN OLD.item_type IS NOT NULL AND NEW.item_type IS NOT OLD.item_type
+BEGIN
+    SELECT RAISE(ABORT, 'item_type is immutable once recorded');
+END;
 
 CREATE INDEX IF NOT EXISTS idx_work_items_assigned_to ON work_items (assigned_to);
 CREATE INDEX IF NOT EXISTS idx_work_items_state ON work_items (state);

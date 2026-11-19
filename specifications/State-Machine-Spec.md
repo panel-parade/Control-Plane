@@ -61,7 +61,7 @@ stateDiagram-v2
 
 Input: `work_id`, `to_state`, `actor`, `evidence` (per table). Output: accepted (new state + audit_id) or rejected (reason code: `ILLEGAL_TRANSITION`, `ACTOR_NOT_PERMITTED`, `EVIDENCE_MISSING`, `NOT_FOUND`). Rejections do not mutate the register.
 
-For T7, `ACTOR_NOT_PERMITTED` is returned when the actor is not the Intent Owner, and `EVIDENCE_MISSING` when no decision record is supplied. Requests that name a non-decision item are rejected as `ILLEGAL_TRANSITION`.
+For T7, `ACTOR_NOT_PERMITTED` is returned when the actor is not the Intent Owner, and `EVIDENCE_MISSING` when no decision record is supplied. Requests that name a non-decision item are rejected as `ILLEGAL_TRANSITION`. Requests that name an item with no recorded `item_type` are rejected as `TYPE_MISSING` (#32).
 
 ## 6. Acceptance Criteria (Sprint 2)
 
@@ -77,4 +77,4 @@ For T7, `ACTOR_NOT_PERMITTED` is returned when the actor is not the Intent Owner
 3. What counts as "Activity recorded" for T1?
 4. Should T1 be rejected when `assigned_to` is null? Proposed: yes.
 5. Should rejected transitions be logged separately?
-6. How are decision items distinguished from execution items in the register? Rule 6 depends on this; proposed: a item-type field. Until it exists, type is inferred from the done criterion.
+6. How are decision items distinguished from execution items in the register? Rule 6 depends on this; proposed: a item-type field. Resolved by #32: items carry an explicit `item_type` (see Work-Register-Spec); the done criterion is no longer used for inference.
