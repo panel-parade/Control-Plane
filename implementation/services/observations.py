@@ -95,7 +95,7 @@ class ObservationRegistry:
                 ).fetchone()
                 if exists is None:
                     raise LookupError(f"work item not found: {work_id}")
-            observation_id = uuid.uuid4().hex
+            observation_id = str(uuid.uuid4())
             now = utc_now()
             conn.execute(
                 """INSERT INTO observations

@@ -1,6 +1,8 @@
 """Observation Registry tests: append-only records, resolution authority,
 no mutation of work items or the audit log, and lookup queries."""
 
+import uuid
+
 import pytest
 
 from schema.db import connect, initialize
@@ -38,6 +40,11 @@ def test_record_defaults_to_open_with_register_timestamp(env):
     assert obs.resolved_by is None and obs.resolved_ts is None
     assert obs.recorded_ts
     assert obs.work_id == "W-1"
+
+
+def test_observation_id_is_canonical_uuid(env):
+    obs = env.record("CONTROL-PLANE", "spec_gap", "gap", "alice")
+    assert str(uuid.UUID(obs.observation_id)) == obs.observation_id
 
 
 def test_record_rejects_unknown_kind_empty_detail_and_unknown_work_item(env):
